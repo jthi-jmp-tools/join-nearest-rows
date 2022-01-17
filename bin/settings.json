@@ -1,0 +1,11 @@
+{
+	"GUI":{
+		"window_title": "Join Nearest Rows",
+		"window_icon": "LayoutHoriz",
+		"keep_dialog_open": 0
+	},
+	"default_direction": "backward",
+	"default_operation": "join",
+	"tolerance": .,
+	"default_sorted": "Unknown"
+}

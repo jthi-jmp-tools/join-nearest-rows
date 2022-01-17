@@ -1,0 +1,67 @@
+Names Default To Here(1);
+
+check_data_tables = function({}, {Default Local},
+	If(N Items(Get Data Table List()) == 0,
+		mini_modal_window("Error", "No datatables open", text_icon = "Error", window_icon = "ErrorSmall");
+		stop();
+	);
+	return(Current Data Table());
+);
+
+check_open_window = function({window_title, show_modal = 0}, {Default Local},
+	If(Contains(Get Window List() << get window title, window_title),
+		If(show_modal,
+			mini_modal_window("Window already open", 
+				"Window " || window_title || " already open.\!NBringing to front.",
+				"WinInformation",
+				"Warning"
+			);
+		);
+		move_window(Window(window_title));
+		stop();
+		write();
+	);
+);
+
+mini_modal_window = function({title, text, text_icon = "BlankIndex", window_icon = "NewApplication"}, {Default Local},
+	New Window(title, <<modal, << show toolbars(0), << show menu(0), << Set Window Icon(window_icon),
+		H List Box(
+			Icon Box(text_icon), 
+			Spacer Box(size(10, 1)), 
+			V Center Box(Text Box(text))
+		)
+	);
+);
+
+load_settings = function({default_settings = Associative Array(), settings_file_name = "settings.json"}, {Default Local},
+	If(File Exists(settings_file_name),
+		settings = Load Text File("settings.json", JSON),
+		settings = default_settings;
+	);
+	return(settings);
+);
+
+get_nw_values = function({window_ref},{Default Local},
+	nw_aa = Associative Array();
+	nw_aa["clbs"] = Transform Each({clb}, Substr(window_ref << Xpath("//ListBoxBox"),2), clb << get items);
+	nw_aa["tebs"] = Transform Each({teb}, (window_ref << Xpath("//TextEditBox")), teb << get text);
+	nw_aa["nebs"] = Transform Each({neb}, (window_ref << Xpath("//NumberEditBox")), neb << get);
+	nw_aa["cbs"] = Transform Each({neb}, (window_ref << Xpath("//CheckBoxBox")), neb << get);
+	nw_aa["rbs"] = Transform Each({neb}, (window_ref << Xpath("//RadioBox")), neb << get);
+	return(nw_aa);
+);
+
+move_window = function({nw}, {Default Local},
+	nw << Show Window(0);
+	
+	Try(
+		cur_window_pos = Current Window() <<Get Window Position();
+		cur_window_size = Current Window() <<Get Window Size();
+		nw << move window(
+			cur_window_pos[1] + cur_window_size[1] / 2 - (nw << Get Window Size)[1] / 2,
+			cur_window_pos[2] + cur_window_size[2] / 2 - (nw << Get Window Size)[2] / 2
+		);
+	);
+	nw  << Bring Window To Front;
+	nw << Show Window(1);
+);

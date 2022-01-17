@@ -1,0 +1,161 @@
+Names Default To Here(1);
+
+Include("GetNearestIndexDistance.jsl");
+
+Define Class("JoinAsof", BaseClass(GetNearestIndexDistance),
+	_init_ = Method({}, );
+
+	create_closest_idx_columns = Method({dt_to, join_to, group_to, dt_with, join_with, group_with, direction = "backward", lookup_sorted = -1, max_distance = .},
+	/*************************************************************************
+		Function: get_nearest_index_distance
+			---Prototype---
+			get_nearest_index_distance(matrix vec_lookup, matrix vec_input, <direction = "backward">, <max_distance = .>)
+			---------------
+			Finds closest index between vec_lookup and vec_input based on direction. If backward or forward direction are used
+			vectors should be sorted. 
+
+		Returns:
+			Matrix with the closest indices and distances
+
+		Parameters:
+			vec_lookup - Input matrix of values used for lookup
+			vec_input - Value used to look for closest match in vec_input
+			direction - Direction to look for closest match. Possible values: "backward", "forward", "nearest", "closest"
+			nearest, closest do same search. You can also add -backward or -forward to these options to tie-break in desired direction
+			lookup_sorted - -1 for unknonw (script will check), 0 for unsorted, 1 for sorted
+			max_distance - Maximum distance between val and values in vec_input.  
+		
+		See also:
+			<get_nearest_index_distance>
+	*************************************************************************/
+		
+		to_idx_col = dt_to << New Column("ClosestIdx_" || join_to || "_" || join_with || "_" || direction, Numeric, Ordinal);
+		with_idx_col = dt_with << New Column("TemporaryIdx", Numeric, Ordinal, <<Set Each Value(Row()));
+		distance_col = dt_to << New Column("Delta_" || join_to || "_" || join_with, Numeric, Continuous);
+		
+		dt_to << Begin Data Update;
+		dt_with << Begin Data Update;
+		
+		If(group_to == "" | group_with == "",
+			m_with = dt_with[0, join_with];
+			m_to = dt_to[0, join_to]; //group_columns
+			{rows, dist} = get_nearest_index_distance(m_with, m_to, direction, lookup_sorted, max_distance);
+			dt_to[0, to_idx_col << get name] = rows;
+			dt_to[0, distance_col << get name] = dist;
+		,
+			Summarize(dt_to, uniq_groups = by(Column(group_to))); //whiuch table to use for this?
+			Try(
+				For Each({value}, uniq_groups, 
+					//matrix with indices for all rows which belong to current group
+					group_rows_with = Loc(dt_with[0, group_with], value); //will require character grouping which is ok
+					group_rows_to = Loc(dt_to[0, group_to], value);
+					If(N Rows(group_rows_to) == 0| N Rows(group_rows_with) == 0,
+						Print("No values in group " || value || " in other table, skipping this group");
+						continue();
+					);
+					m_with = dt_with[group_rows_with, join_with]; //values of current group
+					m_to = dt_to[group_rows_to, join_to]; //values of current group
+					{rows, dist} = get_nearest_index_distance(m_with, m_to, direction, lookup_sorted, max_distance);
+					found_idx_listing = Loc(rows);
+					
+					//delta_values[Loc(closest_m)] = m_with[closest_m[Loc(closest_m)]];
+					dt_to[group_rows_to[found_idx_listing], to_idx_col << get name] = group_rows_with[rows[found_idx_listing]];
+					dt_to[group_rows_to[found_idx_listing], distance_col << get name] = dist[found_idx_listing];
+				)
+			,
+				dt_to << End Data Update;
+				dt_with << End Data Update;
+				Show(exception_msg)
+			);
+		);
+		dt_to << End Data Update;
+		dt_with << End Data Update;
+		Return(Eval List({to_idx_col, with_idx_col, distance_col}));
+	);
+
+	join_closest = Method({dt_to, join_to, group_to, dt_with, join_with, group_with, direction = "backward", lookup_sorted = -1, max_distance = .}, 
+	/*************************************************************************
+		Function: join_closest
+			---Prototype---
+			join_closest(matrix vec_lookup, matrix vec_input, <direction = "backward">, <max_distance = .>)
+			---------------
+			Joins two tables together by timestamp or other continuous table
+
+		Returns:
+			Reference to new joined table
+
+		Parameters:
+			vec_lookup - Input matrix of values used for lookup
+			vec_input - Value used to look for closest match in vec_input
+			direction - Direction to look for closest match. Possible values: "backward", "forward", "nearest", "closest"
+			nearest, closest do same search. You can also add -backward or -forward to these options to tie-break in desired direction
+			max_distance - Maximum distance between val and values in vec_input.  
+		
+		See also:
+			<get_nearest_index_distance>, <create_closest_idx_columns>, <update_closest>
+	*************************************************************************/	
+		{to_idx_col, with_idx_col, distance_col} = create_closest_idx_columns(dt_to, join_to, group_to, dt_with, join_with, group_with, direction, lookup_sorted, max_distance);
+		If(group_to == "" | group_with == "",
+			dt_joined = dt_to << Join(
+				With(dt_with),
+				Copy formula(0),
+				By Matching Columns(to_idx_col = with_idx_col), //grouping here if we have it
+				Drop multiples(0, 0),
+				Include Nonmatches(1, 0),
+				Preserve main table order(1),
+				Outputtable(direction || " join " || (dt_to << get name) || " with " || (dt_with << get name))
+			)
+		, //else
+			dt_joined = dt_to << Join(
+				With(dt_with),
+				Copy formula(0),
+				By Matching Columns(to_idx_col = with_idx_col, Eval(group_to) = Eval(group_with)),
+				Drop multiples(0, 0),
+				Include Nonmatches(1, 0),
+				Preserve main table order(1),
+				Outputtable(direction || " join " || (dt_to << get name) || " with " || (dt_with << get name))
+			)
+		);
+		//most likely we should also exclude time column from dt_to
+		Try(dt_joined << Delete Columns(with_idx_col << get name));
+		dt_to << Delete Columns(to_idx_col, distance_col);
+		dt_with << Delete Columns(with_idx_col);
+		//dt_joined << Delete Columns(Eval List({(to_idx_col << get name), (with_idx_col << get name)}));
+		//how to handle column deletion?
+		Return(dt_joined);
+	);
+
+	update_closest = Method({dt_to, join_to, group_to, dt_with, join_with, group_with, direction = "backward", lookup_sorted = -1, max_distance = .}, 
+	/*************************************************************************
+		Function: join_closest
+			---Prototype---
+			update_closest(matrix vec_lookup, matrix vec_input, <direction = "backward">, <max_distance = .>)
+			---------------
+			Updates dt_to with values from join_to based on timestamp (or other continuous column) join
+
+		Returns:
+
+		Parameters:
+			vec_lookup - Input matrix of values used for lookup
+			vec_input - Value used to look for closest match in vec_input
+			direction - Direction to look for closest match. Possible values: "backward", "forward", "nearest", "closest"
+			nearest, closest do same search. You can also add -backward or -forward to these options to tie-break in desired direction
+			max_distance - Maximum distance between val and values in vec_input.  
+		
+		See also:
+			<get_nearest_index_distance>, <create_closest_idx_columns>, <join_closest>
+	*************************************************************************/	
+		{to_idx_col, with_idx_col, distance_col} = create_closest_idx_columns(dt_to, join_to, group_to, dt_with, join_with, group_with, direction, lookup_sorted, max_distance);
+		show(group_to, group_with);
+		If(group_to == "" | group_with == "",
+			dt_to << Update(With(dt_with), Match Columns(to_idx_col = with_idx_col), Replace Columns in Main Table(None));
+		,//else
+			dt_to << Update(With(dt_with), Match Columns(to_idx_col = with_idx_col, Eval(group_to) = Eval(group_with)), Replace Columns in Main Table(None));
+		);
+		dt_with << Delete Columns(with_idx_col);
+		Try(dt_to << Delete Columns(with_idx_col << get name));
+		dt_to << Delete Columns(to_idx_col);
+	);
+);
+
+New Object(JoinAsof());

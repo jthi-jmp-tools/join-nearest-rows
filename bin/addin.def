@@ -1,0 +1,5 @@
+id=jthi.jmp.tools.join.nearest.rows
+name=JMP-Tools Join Nearest Rows
+supportJmpSE=0
+addinVersion=1
+minJmpVersion=16

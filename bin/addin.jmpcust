@@ -1,0 +1,21 @@
+<!-- JMP Add-In Builder created --><jm:menu_and_toolbar_customizations xmlns:jm="http://www.jmp.com/ns/menu" version="3">
+  <jm:insert_in_main_menu>
+    <jm:insert_in_menu>
+      <jm:name>Add-Ins</jm:name>
+      <jm:insert_after>
+        <jm:name></jm:name>
+        <jm:menu>
+          <jm:name>JMP-TOOLS</jm:name>
+          <jm:caption>JMP-Tools</jm:caption>
+          <jm:command>
+            <jm:name>JOIN NEAREST ROWS</jm:name>
+            <jm:caption>Join Nearest Rows</jm:caption>
+            <jm:action type="text">Names Default To Here(1);Include(&quot;$ADDIN_HOME(jthi.jmp.tools.join.nearest.rows)/join_nearest_rows_gui.jsl&quot;);</jm:action>
+            <jm:tip>Run Join Nearest Rows of JMP-Tools created by @jthi</jm:tip>
+            <jm:icon type="builtin">Update</jm:icon>
+          </jm:command>
+        </jm:menu>
+      </jm:insert_after>
+    </jm:insert_in_menu>
+  </jm:insert_in_main_menu>
+</jm:menu_and_toolbar_customizations>

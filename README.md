@@ -1,14 +1,6 @@
-# Name
-| [Description](#description) | [Usage](#usage) | [Execution](#execution) | [Possible future features](#possible-future-features) |
+# Join Nearest Columns
 
-## Description 
+Join two datatables with continuous column. Can do join backwards, forwards, nearest/closest. Data doesn't have to be sorted but it does speed up the tool execution. Inspiration partially from [Python Pandas - Merge Asof](https://pandas.pydata.org/docs/reference/api/pandas.merge_asof.html) 
 
-## Usage
-
-### GUI
-
-### Options
-
-## Execution
-
-## Possible future features
+# Startup
+![startup](images/startup.png)

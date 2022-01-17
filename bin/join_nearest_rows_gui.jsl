@@ -1,0 +1,184 @@
+﻿Names Default To Here(1);
+
+//Get utility functions
+Include("bin/gui_utilities.jsl"); //or copy them directly here to make more standalone
+JA = Include("bin/join_nearest_rows.jsl");
+
+//setup default settings
+default_settings = ["tolerance" => ., "default_direction" => "backward", "default_operation" => "join", "default_sorted" => "Unknown",
+"GUI" => ["window_icon" => "LayoutHoriz", "window_title" => "Join Nearest Rows", "keep_dialog_open" => 0]];
+
+aa_settings = load_settings(default_settings, settings_file_name = "settings.json");
+
+//check if the table is already open
+check_open_window(aa_settings["GUI"]["window_title"]);
+
+// get list of tables
+dt = check_data_tables();
+list_dt = Sort List(Get Data Table List() << get name);
+If(N Items(list_dt) > 0,
+	list_dt = Sort List(Get Data Table List() << get name);
+	to_table_idx = Try(Contains(list_dt, Current Data Table() << get name), 1);
+	init_to_table = list_dt[to_table_idx];
+	init_with_table = Remove(list_dt, to_table_idx)[1];
+	with_table_idx = Contains(list_dt, init_with_table);
+);
+
+//modify validator function if needed
+validator = function({dt_to, join_to, dt_with, join_with, group_to, group_with}, {Default Local},
+	error_list = {};
+	dt_list = Get Data Table List() << Get Name;
+	If(!Contains(dt_list, dt_to),
+		Insert Into(error_list, "Datatable missing: " || char(dt_to));
+	);
+	If(!Contains(dt_list, dt_with),
+		Insert Into(error_list, "Datatable missing: " || char(dt_with));
+	);
+	If(N Items(join_to) == 0,
+		Insert Into(error_list, "Join to column selection missing");
+	);
+	If(N Items(join_with) == 0,
+		Insert Into(error_list, "Join to column selection missing");
+	);
+
+	If(IsMissing(group_to) != IsMissing(group_with),
+		Insert Into(error_list, "Both grouping columns must be either selected or empty");
+	);
+
+	If(N Items(error_list) > 0,
+		mini_modal_window("Error", Concat Items(error_list, "\!N"), text_icon = "Error", window_icon = "ErrorSmall");
+		return(error_list);
+	);
+	return(error_list);
+);
+
+//modify run_expr which is executed when run button is pressed
+run_expr = Expr(
+	dt_to = (lb_to << get selected)[1];
+	join_to = clb_join_to << get selected;
+	
+	dt_with = (lb_with << get selected)[1];
+	join_with = clb_join_with << get selected;
+	
+	group_to = If(N Items(clb_group_to << get selected) == 0, "", (clb_group_to << get selected)[1]);
+	group_with = If(N Items(clb_group_with << get selected) == 0, "", (clb_group_with << get selected)[1]);
+	
+	validator_value = validator(dt_to, join_to, dt_with, join_with, group_to, group_with);
+	wait(0);
+	If(N Items(validator_value) > 0,
+		stop();
+	):
+	wait(0);
+
+	join_to = join_to[1];
+	join_with = join_with[1];
+	dt_to = Datatable(dt_to);
+	dt_with = Datatable(dt_with);
+	
+	direction = cb_dir << get selected;
+	tolerance = neb_tol << get;
+	sorted_selection = (rb_sorted << get) - 2; //-1 for checking, 0 for nonsorted and 1 for sorted
+	
+	If(cb_dialog << get == 0,
+		Current Window() << Close Window;
+	);
+	
+	If(rb_oper << get selected == "join",
+		script_to_run = EvalExpr(JA:join_closest(Expr(dt_to), Expr(join_to), Expr(group_to), Expr(dt_with), Expr(join_with), Expr(group_with), Expr(direction), Expr(sorted_selection), Expr(tolerance))),
+		script_to_run = EvalExpr(JA:update_closest(Expr(dt_to), Expr(join_to), Expr(group_to), Expr(dt_with), Expr(join_with), Expr(group_with), Expr(direction), Expr(sorted_selection), Expr(tolerance)));
+	);
+	
+	Print(script_to_run);
+	Eval(script_to_run);
+	
+);
+
+direction_options = {"backward", "forward", "nearest", "nearest-backward", "nearest-forward"};
+operation_options = {"join", "update"};
+sorted_options = {"Unknown", "Not-sorted", "Sorted"};
+
+init_dir = Contains(direction_options, aa_settings["default_direction"]);
+init_oper = Contains(operation_options, aa_settings["default_operation"]);
+init_sorted = Contains(sorted_options, aa_settings["default_sorted"]);
+
+update_flc_clb_to = Expr(
+	clb_join_to << Delete Box();
+	Eval(EvalExpr(pb_join_to << Append(
+		clb_join_to = Col List Box(Datatable(Datatable(Expr((lb_to << get selected)[1]))), all, numeric, max selected(1), nlines(5), <<Modeling Type({"Continuous"})),
+	)));
+	clb_group_to << Delete Box();
+	Eval(EvalExpr(pb_group_to << Append(
+		clb_group_to = Col List Box(Datatable(Datatable(Expr((lb_to << get selected)[1]))), all, max selected(1), nlines(5), <<Modeling Type({"Nominal", "Ordinal"}))
+	)));
+);
+update_flc_clb_with = Expr(
+	cur_table = (lb_with << get selected)[1];
+
+	clb_join_with << Delete Box();
+	Eval(EvalExpr(pb_join_with << Append(
+		clb_join_with = Col List Box(Datatable(Datatable(Expr(cur_table))), all, numeric, max selected(1), nlines(5), <<Modeling Type({"Continuous"})),
+	)));
+	clb_group_with << Delete Box();
+	Eval(EvalExpr(pb_group_with << Append(
+		clb_group_with = Col List Box(Datatable(Datatable(Expr(cur_table))), all, max selected(1), nlines(5), <<Modeling Type({"Nominal", "Ordinal"}))
+	)));
+);
+
+
+//spacerboxit sekaan, jotta saadaan pysymän edes vähän kuosissa
+nw = New Window(aa_settings["GUI"]["window_title"], << show toolbars(0), << show menu(0),
+	<<Set Window Icon(aa_settings["GUI"]["window_icon"]),
+	H List Box(
+		Panel Box("To - Datable",
+			lb_to = List Box(list_dt, max selected(1), << Set Selected(to_table_idx), << set script(update_flc_clb_to)),
+			pb_join_to = Panel Box("Select column to join TO",
+				clb_join_to = Col List Box(Datatable(init_to_table), all, numeric, max selected(1), nlines(5), <<Modeling Type({"Continuous"})),
+			),
+			pb_group_to = Panel Box("Select grouping column",
+				Button Box("Clear Selected", clb_group_to << Clear Selection, <<Set Icon("Excluded")),
+				clb_group_to = Col List Box(Datatable(Datatable(init_to_table)), all, max selected(1), nlines(5), <<Modeling Type({"Nominal", "Ordinal"}))
+			),
+		),
+		Spacer Box(Size(10,275), << Color("Green")),
+		Panel Box("With - Datable",
+			lb_with = List Box(list_dt, max selected(1), << Set Selected(with_table_idx), << set script(update_flc_clb_with)),
+			pb_join_with = Panel Box("Select column to join WITH",
+				clb_join_with = Col List Box(Datatable(init_with_table), all, numeric, max selected(1), nlines(5), <<Modeling Type({"Continuous"})),
+			),
+			pb_group_with = Panel Box("Select grouping column",
+				Button Box("Clear Selected", clb_group_with << Clear Selection, <<Set Icon("Excluded")),
+				clb_group_with = Col List Box(Datatable(Datatable(init_with_table)), all, max selected(1), nlines(5), <<Modeling Type({"Nominal", "Ordinal"}))	
+			),
+		),
+		Panel Box("Settings",
+			Lineup Box(N Col(1),
+				SpacerBox(Size(0, 2), Color("Gray")),
+				Text Box("Direction:"),
+				cb_dir = Combo Box(direction_options, <<Set(init_oper)),
+				SpacerBox(Size(0, 2), Color("Gray")),
+				Text Box("Operation:"),
+				rb_oper = Radio Box(operation_options, << Set(init_dir)),
+				SpacerBox(Size(0, 2), Color("Gray")),
+				Text Box("Tolerance:"),
+				neb_tol = Number Edit Box(aa_settings["tolerance"]),
+				SpacerBox(Size(0, 2), Color("Gray")),
+				Text Box("To table column sorted:"),
+				rb_sorted = Radio Box(sorted_options, << Set(init_sorted)),
+				SpacerBox(Size(0, 2), Color("Gray"))
+			)
+		),
+		Panel Box("Actions",
+			Lineup Box(N Col(1),
+				Button Box("Run",
+					run_expr;
+					//Current Window() << Close Window;
+				),
+				Button Box("Close",
+					Current Window() << Close Window;
+				),
+				H List Box(cb_dialog = CheckBox({""}, << Set(aa_settings["GUI"]["keep_dialog_open"])), Text Box("Keep dialog open"))
+			)
+		)
+	)
+);
+Write();
