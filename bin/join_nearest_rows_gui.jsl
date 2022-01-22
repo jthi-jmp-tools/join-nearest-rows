@@ -14,9 +14,9 @@ aa_settings = load_settings(default_settings, settings_file_name = "settings.jso
 check_open_window(aa_settings["GUI"]["window_title"]);
 
 // get list of tables
-dt = check_data_tables();
+dt = check_data_tables(2);
 list_dt = Sort List(Get Data Table List() << get name);
-If(N Items(list_dt) > 0,
+If(N Items(list_dt) > 1,
 	list_dt = Sort List(Get Data Table List() << get name);
 	to_table_idx = Try(Contains(list_dt, Current Data Table() << get name), 1);
 	init_to_table = list_dt[to_table_idx];

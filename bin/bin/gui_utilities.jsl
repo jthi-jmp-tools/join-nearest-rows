@@ -1,8 +1,8 @@
 Names Default To Here(1);
 
-check_data_tables = function({}, {Default Local},
-	If(N Items(Get Data Table List()) == 0,
-		mini_modal_window("Error", "No datatables open", text_icon = "Error", window_icon = "ErrorSmall");
+check_data_tables = function({min_tables = 1}, {Default Local},
+	If(N Items(Get Data Table List()) < min_tables,
+		mini_modal_window("Error", "Not enough datatables open(" || char(min_tables) ||")", text_icon = "Error", window_icon = "ErrorSmall");
 		stop();
 	);
 	return(Current Data Table());
