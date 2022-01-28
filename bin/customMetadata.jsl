@@ -4,7 +4,7 @@ Associative Array(
 	List(
 		List( "addinVersion", 1 ),
 		List( "author", "jthi" ),
-		List( "buildDate", 3725634561 ),
+		List( "buildDate", 3726245295 ),
 		List( "deployedAddinsFilename", "publishedAddins.jsl" ),
 		List( "deployedAddinsLoc", "" ),
 		List( "id", "jthi.jmp.tools.join.nearest.rows" ),

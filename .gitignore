@@ -1,0 +1,11 @@
+.vscode
+.git
+NaturalDocs/
+docs/_html
+docs/Working Data
+developer/
+_developer/
+_*
+._*
+.vscode
+bin/doc/README.md
